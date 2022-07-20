@@ -1,9 +1,14 @@
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::Window,
 };
+
+type Pos = [f32; 2];
+type Col = [f32; 3];
+struct Vert(Pos, Col);
 
 #[repr(C, align(8))]
 struct Size(u32, u32);
@@ -62,7 +67,22 @@ fn main() {
             vertex: wgpu::VertexState {
                 module: &shader_module,
                 entry_point: "vert_main",
-                buffers: &[],
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<Vert>() as _,
+                    step_mode: Default::default(),
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x2,
+                            offset: 0,
+                            shader_location: 0,
+                        },
+                        wgpu::VertexAttribute {
+                            format: wgpu::VertexFormat::Float32x3,
+                            offset: std::mem::size_of::<Pos>() as _,
+                            shader_location: 1,
+                        },
+                    ],
+                }],
             },
             primitive: Default::default(),
             depth_stencil: None,
@@ -75,6 +95,22 @@ fn main() {
         };
         device.create_render_pipeline(&desc)
     };
+
+    #[rustfmt::skip]
+    let verts = &[
+        Vert([-250.0,  250.0], [1.0, 0.0, 1.0]),
+        Vert([ 250.0, -250.0], [0.0, 1.0, 1.0]),
+        Vert([ 250.0,  250.0], [0.0, 0.0, 1.0]),
+        Vert([-250.0,  250.0], [1.0, 0.0, 1.0]),
+        Vert([-250.0, -250.0], [1.0, 1.0, 0.0]),
+        Vert([ 250.0, -250.0], [0.0, 1.0, 1.0]),
+    ];
+
+    let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        label: None,
+        contents: to_bytes(verts),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -153,9 +189,10 @@ fn main() {
                             })],
                             ..Default::default()
                         });
+                    render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                     render_pass.set_bind_group(0, &bind_group, &[]);
                     render_pass.set_pipeline(&render_pipeline);
-                    render_pass.draw(0..3, 0..1)
+                    render_pass.draw(0..verts.len() as _, 0..1)
                 }
 
                 queue.submit(Some(command_encoder.finish()));
