@@ -31,6 +31,33 @@ fn main() {
         (device, queue, surface, config)
     });
 
+    let render_pipeline = {
+        let shader_module = {
+            let desc = wgpu::include_wgsl!("shader.wgsl");
+            device.create_shader_module(desc)
+        };
+        let fragment_state = wgpu::FragmentState {
+            module: &shader_module,
+            entry_point: "frag_main",
+            targets: &[Some(surface_config.format.into())],
+        };
+        let desc = wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: None,
+            vertex: wgpu::VertexState {
+                module: &shader_module,
+                entry_point: "vert_main",
+                buffers: &[],
+            },
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            fragment: Some(fragment_state),
+            multiview: None,
+        };
+        device.create_render_pipeline(&desc)
+    };
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -57,14 +84,19 @@ fn main() {
                 let texture_view = surface_texture.texture.create_view(&Default::default());
 
                 let mut command_encoder = device.create_command_encoder(&Default::default());
-                command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &texture_view,
-                        resolve_target: None,
-                        ops: Default::default(),
-                    })],
-                    ..Default::default()
-                });
+                {
+                    let mut render_pass =
+                        command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &texture_view,
+                                resolve_target: None,
+                                ops: Default::default(),
+                            })],
+                            ..Default::default()
+                        });
+                    render_pass.set_pipeline(&render_pipeline);
+                    render_pass.draw(0..3, 0..1)
+                }
 
                 queue.submit(Some(command_encoder.finish()));
                 surface_texture.present()
