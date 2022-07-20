@@ -1,7 +1,9 @@
 [package]
 name = "wagyu"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
+pollster = "0.2.5"
+wgpu = "0.13.1"
 winit = "0.26.1"
