@@ -6,6 +6,8 @@ use winit::{
 };
 
 fn main() {
+    let epoch = std::time::Instant::now();
+
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
 
@@ -58,8 +60,24 @@ fn main() {
         device.create_render_pipeline(&desc)
     };
 
+    let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: std::mem::size_of::<f32>() as _,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
+        layout: &render_pipeline.get_bind_group_layout(0),
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: uniform_buffer.as_entire_binding(),
+        }],
+    });
+
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::Poll;
 
         match event {
             Event::WindowEvent { event, .. } => match event {
@@ -80,6 +98,9 @@ fn main() {
                 _ => (),
             },
             Event::MainEventsCleared => {
+                let secs = epoch.elapsed().as_secs_f32();
+                queue.write_buffer(&uniform_buffer, 0, &secs.to_ne_bytes());
+
                 let surface_texture = surface.get_current_texture().unwrap();
                 let texture_view = surface_texture.texture.create_view(&Default::default());
 
@@ -94,6 +115,7 @@ fn main() {
                             })],
                             ..Default::default()
                         });
+                    render_pass.set_bind_group(0, &bind_group, &[]);
                     render_pass.set_pipeline(&render_pipeline);
                     render_pass.draw(0..3, 0..1)
                 }
