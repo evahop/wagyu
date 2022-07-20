@@ -66,7 +66,10 @@ fn main() {
             },
             primitive: Default::default(),
             depth_stencil: None,
-            multisample: Default::default(),
+            multisample: wgpu::MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
             fragment: Some(fragment_state),
             multiview: None,
         };
@@ -117,8 +120,27 @@ fn main() {
                 };
                 queue.write_buffer(&uniform_buffer, 0, to_bytes(&uniform));
 
+                let texture_view = {
+                    let desc = wgpu::TextureDescriptor {
+                        label: None,
+                        size: wgpu::Extent3d {
+                            width: surface_config.width,
+                            height: surface_config.height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 4,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: surface_config.format,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    };
+                    device
+                        .create_texture(&desc)
+                        .create_view(&Default::default())
+                };
+
                 let surface_texture = surface.get_current_texture().unwrap();
-                let texture_view = surface_texture.texture.create_view(&Default::default());
+                let resolve_target = surface_texture.texture.create_view(&Default::default());
 
                 let mut command_encoder = device.create_command_encoder(&Default::default());
                 {
@@ -126,7 +148,7 @@ fn main() {
                         command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                                 view: &texture_view,
-                                resolve_target: None,
+                                resolve_target: Some(&resolve_target),
                                 ops: Default::default(),
                             })],
                             ..Default::default()
