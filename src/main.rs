@@ -5,6 +5,19 @@ use winit::{
     window::Window,
 };
 
+#[repr(C, align(8))]
+struct Size(u32, u32);
+
+#[repr(C)]
+struct Uniform {
+    secs: f32,
+    size: Size,
+}
+
+fn to_bytes<T>(t: &T) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(t as *const _ as _, std::mem::size_of_val(t)) }
+}
+
 fn main() {
     let epoch = std::time::Instant::now();
 
@@ -62,7 +75,7 @@ fn main() {
 
     let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
-        size: std::mem::size_of::<f32>() as _,
+        size: std::mem::size_of::<Uniform>() as _,
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     });
@@ -98,8 +111,11 @@ fn main() {
                 _ => (),
             },
             Event::MainEventsCleared => {
-                let secs = epoch.elapsed().as_secs_f32();
-                queue.write_buffer(&uniform_buffer, 0, &secs.to_ne_bytes());
+                let uniform = Uniform {
+                    secs: epoch.elapsed().as_secs_f32(),
+                    size: Size(surface_config.width, surface_config.height),
+                };
+                queue.write_buffer(&uniform_buffer, 0, to_bytes(&uniform));
 
                 let surface_texture = surface.get_current_texture().unwrap();
                 let texture_view = surface_texture.texture.create_view(&Default::default());
