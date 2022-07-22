@@ -33,5 +33,22 @@ fn vert_main(in: VertIn) -> VertOut {
 
 @fragment
 fn frag_main(in: VertOut) -> @location(0) vec4<f32> {
-    return vec4(in.col, 1f);
+    var uv = (2f * in.pos.xy - vec2<f32>(u.size)) / f32(u.size.y);
+    uv.y *= -1f;
+
+    let ro = vec3(0f, 0f, 1f);
+    let rd = normalize(vec3(uv, -1f));
+
+    var t = 0f;
+    loop {
+        let p = ro + rd * t;
+        let d = min(length(p) - .25, p.y + .25);
+        if d < .001 { break; }
+        t += d;
+        if t > 20f { break; }
+    }
+
+    t = clamp(t / 20f, 0f, 1f);
+
+    return vec4(in.col * t, 1f);
 }
